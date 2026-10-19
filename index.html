@@ -46,7 +46,7 @@
   <div id="root"></div>
 
 <script type="text/babel">
-const { useState, useEffect, useCallback, useMemo } = React;
+const { useState, useEffect, useCallback, useMemo, useRef } = React;
 
 // ─── Crypto helpers ──────────────────────────────────────────────────────────
 async function sha256(text) {
@@ -127,6 +127,7 @@ const MEAL_SLOTS = [
   { id: "cena", label: "Cena" },
 ];
 
+// Catálogo de ejemplo con valores aproximados. El grupo lo revisa y lo amplía.
 const FOOD_CATALOG = [
   { name: "Pechuga de pollo (150g)", kcal: 248, p: 46, c: 0, g: 5 },
   { name: "Arroz integral (1 taza)", kcal: 216, p: 5, c: 45, g: 2 },
@@ -143,7 +144,94 @@ const FOOD_CATALOG = [
   { name: "Lentejas cocidas (1 taza)", kcal: 230, p: 18, c: 40, g: 1 },
   { name: "Queso fresco (50g)", kcal: 90, p: 9, c: 2, g: 5 },
   { name: "Smoothie de frutas", kcal: 210, p: 4, c: 45, g: 2 },
+  { name: "Café con leche (1 taza)", kcal: 110, p: 6, c: 10, g: 5 },
+  { name: "Mate cocido con leche", kcal: 90, p: 5, c: 9, g: 4 },
+  { name: "Pan francés (1 unidad)", kcal: 140, p: 4, c: 28, g: 1 },
+  { name: "Tostadas con queso untable y mermelada", kcal: 220, p: 6, c: 34, g: 6 },
+  { name: "Medialuna", kcal: 190, p: 3, c: 20, g: 11 },
+  { name: "Galletitas de agua (4)", kcal: 120, p: 3, c: 20, g: 3 },
+  { name: "Manzana", kcal: 95, p: 0, c: 25, g: 0 },
+  { name: "Mandarina (2)", kcal: 90, p: 1, c: 22, g: 0 },
+  { name: "Granola con yogur", kcal: 260, p: 9, c: 38, g: 8 },
+  { name: "Licuado de banana con leche", kcal: 220, p: 8, c: 38, g: 5 },
+  { name: "Milanesa de carne al horno", kcal: 330, p: 28, c: 18, g: 16 },
+  { name: "Milanesa de pollo al horno", kcal: 290, p: 30, c: 16, g: 11 },
+  { name: "Bife de carne magra (150g)", kcal: 280, p: 38, c: 0, g: 14 },
+  { name: "Fideos con salsa de tomate (1 plato)", kcal: 380, p: 12, c: 70, g: 6 },
+  { name: "Puré de papa (1 taza)", kcal: 210, p: 4, c: 36, g: 6 },
+  { name: "Guiso de lentejas (1 plato)", kcal: 360, p: 20, c: 50, g: 8 },
+  { name: "Tarta de verdura (1 porción)", kcal: 300, p: 10, c: 28, g: 17 },
+  { name: "Empanada de carne al horno", kcal: 250, p: 11, c: 24, g: 12 },
+  { name: "Pizza de muzzarella (1 porción)", kcal: 280, p: 12, c: 33, g: 11 },
+  { name: "Zapallitos rellenos (2 mitades)", kcal: 230, p: 13, c: 14, g: 13 },
+  { name: "Calabaza al horno (200g)", kcal: 80, p: 2, c: 18, g: 0 },
+  { name: "Sopa de verduras", kcal: 120, p: 4, c: 20, g: 3 },
+  { name: "Merluza al horno (150g)", kcal: 160, p: 32, c: 0, g: 3 },
+  { name: "Ensalada de garbanzos", kcal: 280, p: 12, c: 36, g: 9 },
+  { name: "Arroz con pollo (1 plato)", kcal: 420, p: 28, c: 52, g: 10 },
+  { name: "Wok de verduras con arroz", kcal: 340, p: 9, c: 58, g: 8 },
+  { name: "Sandwich de jamón y queso", kcal: 320, p: 18, c: 30, g: 14 },
 ];
+
+// Plan alimenticio: combinaciones fijas del catálogo por franja y la parte de la meta diaria que le toca a cada una.
+const PLAN_SHARE = { desayuno: 0.25, almuerzo: 0.35, merienda: 0.15, cena: 0.25 };
+const PLAN_PORTIONS = [1, 1.5, 2];
+const PLAN_COMBOS = {
+  desayuno: [
+    ["Café con leche (1 taza)", "Tostadas integrales (2)", "Queso fresco (50g)"],
+    ["Avena con fruta", "Café con leche (1 taza)"],
+    ["Yogur natural", "Banana", "Frutos secos (30g)"],
+    ["Mate cocido con leche", "Pan francés (1 unidad)", "Huevo (1 unidad)"],
+    ["Licuado de banana con leche", "Tostadas con queso untable y mermelada"],
+    ["Café con leche (1 taza)", "Huevo (1 unidad)", "Tostadas integrales (2)", "Palta (1/2 unidad)"],
+    ["Granola con yogur", "Banana"],
+  ],
+  almuerzo: [
+    ["Pechuga de pollo (150g)", "Arroz integral (1 taza)", "Ensalada mixta"],
+    ["Milanesa de carne al horno", "Puré de papa (1 taza)"],
+    ["Guiso de lentejas (1 plato)", "Manzana"],
+    ["Fideos con salsa de tomate (1 plato)", "Ensalada mixta"],
+    ["Tarta de verdura (1 porción)", "Ensalada de garbanzos"],
+    ["Bife de carne magra (150g)", "Batata asada (200g)", "Ensalada mixta"],
+    ["Arroz con pollo (1 plato)", "Ensalada mixta"],
+    ["Empanada de carne al horno", "Empanada de carne al horno", "Ensalada mixta"],
+  ],
+  merienda: [
+    ["Yogur natural", "Manzana"],
+    ["Mate cocido con leche", "Galletitas de agua (4)", "Queso fresco (50g)"],
+    ["Café con leche (1 taza)", "Medialuna"],
+    ["Smoothie de frutas"],
+    ["Banana", "Frutos secos (30g)"],
+    ["Sandwich de jamón y queso", "Mandarina (2)"],
+  ],
+  cena: [
+    ["Merluza al horno (150g)", "Calabaza al horno (200g)", "Ensalada mixta"],
+    ["Salmón a la plancha (150g)", "Batata asada (200g)"],
+    ["Milanesa de pollo al horno", "Ensalada mixta"],
+    ["Sopa de verduras", "Zapallitos rellenos (2 mitades)"],
+    ["Wok de verduras con arroz", "Huevo (1 unidad)"],
+    ["Pizza de muzzarella (1 porción)", "Pizza de muzzarella (1 porción)", "Ensalada mixta"],
+    ["Lentejas cocidas (1 taza)", "Arroz integral (1 taza)", "Ensalada mixta"],
+  ],
+};
+
+// Sugerencias de una franja, de la más cercana a la más lejana a su parte de la meta.
+function planSuggestions(slotId, calorieGoal) {
+  const target = calorieGoal * PLAN_SHARE[slotId];
+  const options = PLAN_COMBOS[slotId].map(names => {
+    const items = names.map(n => FOOD_CATALOG.find(f => f.name === n));
+    const base = items.reduce((s, f) => ({ kcal: s.kcal + f.kcal, p: s.p + f.p, c: s.c + f.c, g: s.g + f.g }), { kcal: 0, p: 0, c: 0, g: 0 });
+    const portion = PLAN_PORTIONS.reduce((best, f) => Math.abs(base.kcal * f - target) < Math.abs(base.kcal * best - target) ? f : best, 1);
+    const counts = {};
+    names.forEach(n => { counts[n] = (counts[n] || 0) + 1; });
+    const label = Object.keys(counts).map(n => counts[n] > 1 ? `${counts[n]} × ${n}` : n).join(" + ");
+    return {
+      label, portion,
+      kcal: Math.round(base.kcal * portion), p: Math.round(base.p * portion), c: Math.round(base.c * portion), g: Math.round(base.g * portion),
+    };
+  });
+  return options.sort((a, b) => Math.abs(a.kcal - target) - Math.abs(b.kcal - target));
+}
 
 const TRAINING_TYPES = [
   { id: "cardio", label: "Cardio", metPerMin: 0.13 },
@@ -178,20 +266,50 @@ const COLORS = {
 };
 
 // ─── Utilidades ───────────────────────────────────────────────────────────────
-const todayISO = () => new Date().toISOString().slice(0, 10);
+// Fecha en el día local del usuario (no UTC): a las 22:00 sigue siendo "hoy".
+function localISO(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+const todayISO = () => localISO();
 function uid() { return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
 
-function defaultProfile() {
+// Ningún usuario tiene datos físicos por defecto: se cargan en el paso de datos físicos.
+function emptyData() {
   return {
-    account: { name: "Usuario", email: "usuario@progressplus.app" },
-    profile: { age: 30, weight: 70, height: 170, sex: "masculino", activity: "moderado" },
-    goal: "mantener",
-    weightLog: [{ id: "init", date: todayISO(), weight: 70 }],
+    account: { name: "", email: "" },
+    profile: null,
+    goal: null,
+    weightLog: [],
     meals: [], water: [], workouts: [], achievements: [],
-    settings: { notifWater: true, notifMeals: true, notifWorkouts: true, notifAchievements: true, waterReminderFreqHours: 2, units: "metric" },
-    onboardingDone: true,
+    settings: { notifWater: false, waterReminderFreqHours: 2 },
+    onboardingDone: false,
   };
 }
+
+const PROFILE_LIMITS = { age: [10, 100], weight: [20, 300], height: [100, 250] };
+
+// Devuelve un mensaje de error o null si los datos están dentro de rango.
+function validateProfile({ age, weight, height }) {
+  if (!Number.isInteger(age) || age < PROFILE_LIMITS.age[0] || age > PROFILE_LIMITS.age[1]) return "La edad tiene que estar entre 10 y 100 años.";
+  if (!(weight >= PROFILE_LIMITS.weight[0] && weight <= PROFILE_LIMITS.weight[1])) return "El peso tiene que estar entre 20 y 300 kg.";
+  if (!(height >= PROFILE_LIMITS.height[0] && height <= PROFILE_LIMITS.height[1])) return "La altura tiene que estar entre 100 y 250 cm.";
+  return null;
+}
+
+function calcBMI({ weight, height }) {
+  const m = height / 100;
+  return Math.round((weight / (m * m)) * 10) / 10;
+}
+// Categorías para adultos. A menores de 18 no les corresponde esta tabla.
+function bmiCategory(bmi, age) {
+  if (age < 18) return null;
+  if (bmi < 18.5) return "Bajo peso";
+  if (bmi < 25) return "Peso normal";
+  if (bmi < 30) return "Sobrepeso";
+  return "Obesidad";
+}
+
+function isMinor(profile) { return profile.age < 18; }
 
 function calcBMR({ weight, height, age, sex }) {
   return sex === "femenino"
@@ -202,13 +320,50 @@ function calcCalorieGoal(profile, goalId) {
   const bmr = calcBMR(profile);
   const activity = ACTIVITY_LEVELS.find(a => a.id === profile.activity) || ACTIVITY_LEVELS[0];
   const goal = GOALS.find(g => g.id === goalId) || GOALS[2];
-  return Math.max(1200, Math.round(bmr * activity.factor * (1 + goal.adj) / 10) * 10);
+  // Para menores de 18, "bajar de peso" no reduce calorías: se usa la meta de mantenimiento.
+  const adj = goal.id === "bajar_peso" && isMinor(profile) ? 0 : goal.adj;
+  return Math.max(1200, Math.round(bmr * activity.factor * (1 + adj) / 10) * 10);
 }
 function calcWaterGoalMl(profile) {
   const activity = ACTIVITY_LEVELS.find(a => a.id === profile.activity) || ACTIVITY_LEVELS[0];
   const bonus = activity.id === "intenso" ? 500 : activity.id === "moderado" ? 300 : 0;
   return Math.round((profile.weight * 35 + bonus) / 50) * 50;
 }
+// ─── Logros ───────────────────────────────────────────────────────────────────
+// Días (YYYY-MM-DD) en los que el agua registrada alcanzó la meta.
+function waterGoalDays(data, waterGoalMl) {
+  const byDay = {};
+  data.water.forEach(w => { byDay[w.date] = (byDay[w.date] || 0) + w.ml; });
+  return Object.keys(byDay).filter(d => byDay[d] >= waterGoalMl).sort();
+}
+function longestStreak(sortedDays) {
+  let best = 0, run = 0, prev = null;
+  sortedDays.forEach(d => {
+    const cur = new Date(d + "T00:00:00");
+    if (prev) {
+      const next = new Date(prev); next.setDate(prev.getDate() + 1);
+      run = localISO(next) === d ? run + 1 : 1;
+    } else run = 1;
+    best = Math.max(best, run);
+    prev = cur;
+  });
+  return best;
+}
+// Cada logro se otorga exactamente cuando se cumple lo que dice su descripción.
+function earnedAchievements(data, waterGoalMl) {
+  const earned = [];
+  if (data.meals.length >= 1) earned.push("primer_registro");
+  const goalDays = waterGoalDays(data, waterGoalMl);
+  if (goalDays.length >= 3) earned.push("hidratacion_3");
+  if (data.workouts.length >= 5) earned.push("entreno_5");
+  const activeDays = new Set([...data.meals, ...data.water, ...data.workouts, ...data.weightLog].map(r => r.date));
+  if (activeDays.size >= 7) earned.push("semana_completa");
+  if (longestStreak(goalDays) >= 7) earned.push("racha_agua_7");
+  // El primer registro de peso es el del alta; el logro llega con el siguiente.
+  if (data.weightLog.length >= 2) earned.push("peso_registrado");
+  return earned;
+}
+
 function macroSplit(calorieGoal, goalId) {
   let pPct = 0.3, cPct = 0.4, gPct = 0.3;
   if (goalId === "ganar_masa") { pPct = 0.32; cPct = 0.43; gPct = 0.25; }
@@ -532,7 +687,7 @@ function WeekStrip({ todayStr }) {
     <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 7, margin: "14px 20px 4px" }}>
       {labels.map((label, i) => {
         const d = new Date(monday); d.setDate(monday.getDate() + i);
-        const active = d.toISOString().slice(0, 10) === todayStr;
+        const active = localISO(d) === todayStr;
         return (
           <div key={label} style={{ textAlign: "center", padding: "8px 0", borderRadius: 14, background: active ? `linear-gradient(160deg, ${COLORS.moss}, ${COLORS.mossDark})` : "rgba(255,255,255,0.78)", color: active ? "#fff" : COLORS.graphite, boxShadow: active ? "0 14px 26px -14px rgba(8,122,42,0.7)" : "0 6px 14px -10px rgba(20,32,26,0.18)", transform: active ? "translateY(-2px) scale(1.04)" : "none", transition: "all .2s" }}>
             <div style={{ fontSize: 9.5, fontWeight: 800 }}>{label}</div>
@@ -569,7 +724,8 @@ function StatPill({ label, value, color }) {
   );
 }
 
-function DashboardScreen({ data, todayStr, consumedKcal, calorieGoal, consumedWater, waterGoalMl, todayWorkouts, goalDef, onNavTab, accountName }) {
+function DashboardScreen({ data, todayStr, consumedKcal, calorieGoal, consumedWater, waterGoalMl, todayWorkouts, goalDef, onNavTab, accountName, macros, consumedProtein, consumedCarbs, consumedFat }) {
+  const macroPct = (v, goal) => Math.min(100, Math.round((v / goal) * 100 || 0)) + "%";
   const firstName = (accountName || "Usuario").split(" ")[0];
   const dateLabel = new Date(todayStr + "T00:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
   const kcalPct = Math.min(100, Math.round((consumedKcal / calorieGoal) * 100 || 0));
@@ -583,9 +739,9 @@ function DashboardScreen({ data, todayStr, consumedKcal, calorieGoal, consumedWa
           <h1 style={{ fontWeight: 900, fontSize: 24, margin: "4px 0 0", color: COLORS.ink }}>Hola, {firstName} <span style={{ display: "inline-block", animation: "ppFloat 2.4s ease-in-out infinite" }}>👋</span></h1>
           <p style={{ fontSize: 12, color: COLORS.graphite, marginTop: 2 }}>Vamos por tus objetivos.</p>
         </div>
-        <button style={{ width: 44, height: 44, borderRadius: 16, border: "none", background: "linear-gradient(135deg, #FFFFFF, #F1EDFF)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 16px 30px -20px rgba(124,100,255,0.55)", position: "relative" }}>
+        <button onClick={() => onNavTab("hydration")} title="Recordatorios de agua" style={{ width: 44, height: 44, borderRadius: 16, border: "none", cursor: "pointer", background: "linear-gradient(135deg, #FFFFFF, #F1EDFF)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 16px 30px -20px rgba(124,100,255,0.55)", position: "relative" }}>
           <Icon name="bell" size={18} color={COLORS.violetDark} />
-          <span style={{ position: "absolute", right: 8, top: 8, width: 9, height: 9, borderRadius: "50%", background: COLORS.coral, border: "2px solid #fff" }} />
+          {data.settings.notifWater && <span style={{ position: "absolute", right: 8, top: 8, width: 9, height: 9, borderRadius: "50%", background: COLORS.moss, border: "2px solid #fff" }} />}
         </button>
       </div>
       <WeekStrip todayStr={todayStr} />
@@ -606,9 +762,9 @@ function DashboardScreen({ data, todayStr, consumedKcal, calorieGoal, consumedWa
               <div style={{ width: kcalPct + "%", height: "100%", borderRadius: 999, background: "linear-gradient(90deg, #FFD05A, #FFE9A8)", transition: "width .7s ease" }} />
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 18, width: 230 }}>
-              <StatPill label="Proteinas" value="72%" color={COLORS.yellow} />
-              <StatPill label="Carbos" value="58%" color="#B7F7C5" />
-              <StatPill label="Grasas" value="43%" color="#FFFFFF" />
+              <StatPill label="Proteinas" value={macroPct(consumedProtein, macros.protein)} color={COLORS.yellow} />
+              <StatPill label="Carbos" value={macroPct(consumedCarbs, macros.carbs)} color="#B7F7C5" />
+              <StatPill label="Grasas" value={macroPct(consumedFat, macros.fat)} color="#FFFFFF" />
             </div>
           </div>
           <div style={{ position: "absolute", right: 108, top: 22, zIndex: 3 }}>
@@ -651,7 +807,31 @@ function MacroBar({ label, value, goal, color }) {
   );
 }
 
-function NutritionScreen({ calorieGoal, consumedKcal, macros, consumedProtein, consumedCarbs, consumedFat, todayMeals, onOpenMealSheet, onDeleteMeal }) {
+function Notice({ children, tone = "info", style }) {
+  const tones = {
+    info: { bg: COLORS.waterLight, color: COLORS.waterDark },
+    warn: { bg: COLORS.amberLight, color: "#8A5A00" },
+  };
+  const t = tones[tone];
+  return (
+    <div style={{ background: t.bg, color: t.color, borderRadius: 14, padding: "10px 13px", fontSize: 12, lineHeight: 1.45, fontWeight: 600, ...style }}>{children}</div>
+  );
+}
+
+function NutritionistNotice({ style }) {
+  return <Notice tone="warn" style={style}>Las metas y el plan son estimaciones generales. Progress+ no reemplaza la consulta con un nutricionista o un médico.</Notice>;
+}
+
+function DeviceDataNotice({ style }) {
+  return <Notice style={style}>Tus datos se guardan solo en este dispositivo, en este navegador. Si borrás los datos del navegador o usás otro dispositivo, no vas a verlos.</Notice>;
+}
+
+function NutritionScreen({ calorieGoal, consumedKcal, macros, consumedProtein, consumedCarbs, consumedFat, todayMeals, onOpenMealSheet, onDeleteMeal, planOffsets, onRotatePlan, onLogPlan, minorLosing }) {
+  const plan = MEAL_SLOTS.map(slot => {
+    const options = planSuggestions(slot.id, calorieGoal);
+    return { slot, option: options[(planOffsets[slot.id] || 0) % options.length] };
+  });
+  const planTotal = plan.reduce((s, x) => s + x.option.kcal, 0);
   const remaining = Math.max(0, calorieGoal - consumedKcal);
   const pct = Math.min(100, Math.round((consumedKcal / calorieGoal) * 100 || 0));
   const mealLooks = {
@@ -686,6 +866,32 @@ function NutritionScreen({ calorieGoal, consumedKcal, macros, consumedProtein, c
             <MacroBar label="Grasas" value={consumedFat} goal={macros.fat} color={COLORS.water} />
           </div>
         </Card>
+        {minorLosing && (
+          <Notice tone="warn" style={{ marginTop: 12 }}>Como sos menor de 18, el objetivo "Bajar de peso" usa la meta de mantenimiento. Si querés bajar de peso, consultalo con un profesional de la salud.</Notice>
+        )}
+        <NutritionistNotice style={{ marginTop: 12 }} />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", margin: "20px 0 4px" }}>
+          <div style={{ fontWeight: 900, fontSize: 15 }}>Plan sugerido para hoy</div>
+          <div style={{ fontSize: 12, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: COLORS.mossDark }}>{planTotal} / {calorieGoal} kcal</div>
+        </div>
+        <p style={{ fontSize: 12, color: COLORS.graphite, marginBottom: 10 }}>Armado con el catálogo según tu meta. Tocá "Registrar" para sumarlo a la franja.</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {plan.map(({ slot, option }) => (
+            <Card key={slot.id} style={{ padding: 13 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+                <div style={{ fontWeight: 900, fontSize: 13.5 }}>{slot.label}</div>
+                <div style={{ fontSize: 12, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: COLORS.mossDark }}>{option.kcal} kcal</div>
+              </div>
+              <div style={{ fontSize: 12.5, marginTop: 5, lineHeight: 1.4 }}>{option.label}</div>
+              {option.portion !== 1 && <div style={{ fontSize: 11.5, color: COLORS.graphite, marginTop: 3 }}>Porción × {String(option.portion).replace(".", ",")}</div>}
+              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                <button onClick={() => onLogPlan(slot.id, option)} style={{ flex: 1, border: "none", borderRadius: 12, padding: "9px 10px", cursor: "pointer", fontWeight: 800, fontSize: 12.5, color: "#fff", background: `linear-gradient(135deg, ${COLORS.moss}, ${COLORS.mossDark})`, fontFamily: "inherit" }}>Registrar</button>
+                <button onClick={() => onRotatePlan(slot.id)} style={{ border: `1px solid ${COLORS.paperLine}`, borderRadius: 12, padding: "9px 12px", cursor: "pointer", fontWeight: 700, fontSize: 12.5, color: COLORS.ink, background: COLORS.cream, fontFamily: "inherit" }}>Otra opción</button>
+              </div>
+            </Card>
+          ))}
+        </div>
+        <div style={{ fontWeight: 900, fontSize: 15, margin: "22px 0 0" }}>Registrado hoy</div>
         <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 12 }}>
           {MEAL_SLOTS.map(slot => {
             const items = todayMeals.filter(m => m.slot === slot.id);
@@ -722,7 +928,8 @@ function NutritionScreen({ calorieGoal, consumedKcal, macros, consumedProtein, c
   );
 }
 
-function HydrationScreen({ consumedWater, waterGoalMl, onAddWater, waterCustom, setWaterCustom, onAddCustom, settings, onToggleSetting, onSetFreq }) {
+function HydrationScreen({ consumedWater, waterGoalMl, onAddWater, waterCustom, setWaterCustom, onAddCustom, settings, onToggleReminders, onSetFreq, todayWater, onDeleteWater }) {
+  const notifSupported = typeof Notification !== "undefined";
   const pct = Math.min(1, consumedWater / waterGoalMl);
   const pctLabel = Math.round(pct * 100);
   return (
@@ -742,8 +949,8 @@ function HydrationScreen({ consumedWater, waterGoalMl, onAddWater, waterCustom, 
               </div>
             </ProgressRing>
           </div>
-          <div style={{ fontWeight: 900, marginTop: 14, color: COLORS.ink }}>¡Sigue así! 🌊</div>
-          <div style={{ fontSize: 12, color: COLORS.graphite, marginTop: 3 }}>Tu cuerpo te lo agradece</div>
+          <div style={{ fontWeight: 900, marginTop: 14, color: COLORS.ink }}>{consumedWater >= waterGoalMl ? "¡Meta cumplida! 🌊" : "¡Seguí así! 🌊"}</div>
+          <div style={{ fontSize: 12, color: COLORS.graphite, marginTop: 3 }}>La meta se ajusta a tu peso y tu nivel de actividad</div>
         </Card>
         <div style={{ textAlign: "left", fontWeight: 900, fontSize: 14, margin: "20px 0 10px" }}>Registra tu consumo</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
@@ -764,16 +971,32 @@ function HydrationScreen({ consumedWater, waterGoalMl, onAddWater, waterCustom, 
               <div style={{ width: 34, height: 34, borderRadius: 11, background: COLORS.waterLight, display: "flex", alignItems: "center", justifyContent: "center" }}><Icon name="bell" size={17} color={COLORS.waterDark} /></div>
               <span style={{ fontWeight: 900, fontSize: 14 }}>Recordatorios</span>
             </div>
-            <Toggle on={settings.notifWater} onClick={() => onToggleSetting("notifWater")} />
+            <Toggle on={settings.notifWater} onClick={onToggleReminders} />
           </div>
-          {settings.notifWater && (<div style={{ marginTop: 16 }}><p style={{ fontSize: 12.5, color: COLORS.graphite, marginBottom: 8 }}>Frecuencia</p><div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{[1, 2, 3, 4].map(h => (<Chip key={h} active={settings.waterReminderFreqHours === h} onClick={() => onSetFreq(h)}>Cada {h}h</Chip>))}</div></div>)}
+          <p style={{ fontSize: 12, color: COLORS.graphite, marginTop: 10, lineHeight: 1.45 }}>
+            Te avisamos si todavía no llegaste a la meta. Los avisos llegan solo mientras Progress+ está abierto en el navegador{notifSupported ? "" : "; este navegador no admite notificaciones, así que aparecen dentro de la app"}.
+          </p>
+          {settings.notifWater && (<div style={{ marginTop: 14 }}><p style={{ fontSize: 12.5, color: COLORS.graphite, marginBottom: 8 }}>Frecuencia</p><div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{[1, 2, 3, 4].map(h => (<Chip key={h} active={settings.waterReminderFreqHours === h} onClick={() => onSetFreq(h)}>Cada {h}h</Chip>))}</div></div>)}
         </Card>
+        <div style={{ textAlign: "left", fontWeight: 900, fontSize: 14, margin: "20px 0 10px" }}>Registros de hoy</div>
+        {todayWater.length === 0 ? (
+          <EmptyState icon="drop" text="Todavía no registraste agua hoy." />
+        ) : (
+          <Card style={{ textAlign: "left", padding: "6px 16px" }}>
+            {todayWater.slice().reverse().map((w, i, arr) => (
+              <div key={w.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i === arr.length - 1 ? "none" : `1px solid ${COLORS.paperLine}` }}>
+                <span style={{ fontSize: 13, fontWeight: 700 }}>{w.ml} ml <span style={{ color: COLORS.graphite, fontWeight: 500 }}>· {new Date(w.time).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false })}</span></span>
+                <button onClick={() => onDeleteWater(w.id)} title="Borrar" style={{ background: "none", border: "none", cursor: "pointer", opacity: 0.6 }}><Icon name="trash" size={14} color={COLORS.graphite} /></button>
+              </div>
+            ))}
+          </Card>
+        )}
       </div>
     </div>
   );
 }
 
-function TrainingScreen({ todayWorkouts, weightLog, onOpenWorkoutSheet, onOpenWeightSheet }) {
+function TrainingScreen({ todayWorkouts, weightLog, onOpenWorkoutSheet, onOpenWeightSheet, onDeleteWeight }) {
   const [tab, setTab] = useState("entrenamientos");
   const maxW = Math.max(...weightLog.map(w => w.weight), 1);
   const minW = Math.min(...weightLog.map(w => w.weight), maxW - 1);
@@ -846,7 +1069,19 @@ function TrainingScreen({ todayWorkouts, weightLog, onOpenWorkoutSheet, onOpenWe
                     return (<div key={w.id} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}><div style={{ width: "100%", height: h + "%", background: "linear-gradient(180deg, " + COLORS.moss + ", " + COLORS.mossDark + ")", borderRadius: "8px 8px 3px 3px", transition: "height .5s ease" }} /><span style={{ fontSize: 9, color: COLORS.graphite }}>{new Date(w.date + "T00:00:00").getDate()}</span></div>);
                   })}
                 </div>
-                <div style={{ textAlign: "center", fontSize: 12, color: COLORS.graphite }}>ultimo registro</div>
+                <div style={{ textAlign: "center", fontSize: 12, color: COLORS.graphite }}>últimos registros</div>
+              </Card>
+            )}
+            {weightLog.length > 0 && (
+              <Card style={{ padding: "6px 16px", marginTop: 14 }}>
+                {weightLog.slice().reverse().map((w, i, arr) => (
+                  <div key={w.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i === arr.length - 1 ? "none" : `1px solid ${COLORS.paperLine}` }}>
+                    <span style={{ fontSize: 13, fontWeight: 700 }}>{w.weight} kg <span style={{ color: COLORS.graphite, fontWeight: 500 }}>· {new Date(w.date + "T00:00:00").toLocaleDateString("es-AR")}</span></span>
+                    {weightLog.length > 1 && (
+                      <button onClick={() => onDeleteWeight(w.id)} title="Borrar" style={{ background: "none", border: "none", cursor: "pointer", opacity: 0.6 }}><Icon name="trash" size={14} color={COLORS.graphite} /></button>
+                    )}
+                  </div>
+                ))}
               </Card>
             )}
           </>
@@ -862,6 +1097,7 @@ function SettingsContent({ data, onResetData, onLogout }) {
     <div>
       <p style={{ fontSize: 11.5, fontWeight: 700, color: COLORS.graphite, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>Cuenta</p>
       <SettingsRow label="Correo" value={data.account?.email} />
+      <DeviceDataNotice style={{ marginTop: 12 }} />
       <div style={{ height: 14 }} />
 
       {/* Logout */}
@@ -907,7 +1143,7 @@ function ProfileStatsScreen({ data, goalDef, statsRange, setStatsRange, onEditPr
     const arr = [];
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date(); d.setDate(d.getDate() - i);
-      const iso = d.toISOString().slice(0, 10);
+      const iso = localISO(d);
       const kcal = data.meals.filter(m => m.date === iso).reduce((s, m) => s + m.kcal, 0);
       const water = data.water.filter(w => w.date === iso).reduce((s, w) => s + w.ml, 0);
       arr.push({ date: iso, kcal, water });
@@ -915,6 +1151,9 @@ function ProfileStatsScreen({ data, goalDef, statsRange, setStatsRange, onEditPr
     return arr;
   }, [data, days]);
   const maxKcal = Math.max(...rangeData.map(d => d.kcal), calorieGoal, 1);
+  const bmi = calcBMI(data.profile);
+  const bmiCat = bmiCategory(bmi, data.profile.age);
+  const bmiLabel = String(bmi).replace(".", ",") + (bmiCat ? ` · ${bmiCat}` : "");
   const badgeColors = [
     { bg: "linear-gradient(160deg, #DFF7E4, #7FE08F)", ring: COLORS.mossDark },
     { bg: "linear-gradient(160deg, #E3DBFF, #B6A4FF)", ring: COLORS.violetDark },
@@ -950,9 +1189,12 @@ function ProfileStatsScreen({ data, goalDef, statsRange, setStatsRange, onEditPr
             </button>
           </div>
           <DataRow label="Edad" value={`${data.profile.age} años`} />
+          <DataRow label="Sexo" value={data.profile.sex === "femenino" ? "Femenino" : "Masculino"} />
           <DataRow label="Peso" value={`${data.profile.weight} kg`} />
           <DataRow label="Altura" value={`${data.profile.height} cm`} />
-          <DataRow label="Actividad" value={ACTIVITY_LEVELS.find(a => a.id === data.profile.activity)?.label} last />
+          <DataRow label="Actividad" value={ACTIVITY_LEVELS.find(a => a.id === data.profile.activity)?.label} />
+          <DataRow label="IMC" value={bmiLabel} last />
+          {isMinor(data.profile) && <p style={{ fontSize: 11.5, color: COLORS.graphite, marginTop: 8, lineHeight: 1.4 }}>Para menores de 18 el IMC se interpreta con tablas por edad, así que no mostramos categoría.</p>}
         </Card>
         <Card style={{ marginBottom: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
@@ -1337,6 +1579,8 @@ function RegisterScreen({ onRegister, onGoLogin, error, loading }) {
           )}
         </div>
 
+        <DeviceDataNotice style={{ marginBottom: 12 }} />
+
         <button
           onClick={() => setStep(2)}
           disabled={!canNext}
@@ -1372,6 +1616,71 @@ function RegisterScreen({ onRegister, onGoLogin, error, loading }) {
   );
 }
 
+// Paso obligatorio del registro: sin estos datos no se entra a la app.
+function PhysicalDataScreen({ name, onSubmit, onLogout }) {
+  const [form, setForm] = useState({ age: "", sex: "", weight: "", height: "", activity: "", goal: "" });
+  const [error, setError] = useState("");
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  function submit() {
+    const profile = { age: Number(form.age), weight: parseFloat(form.weight), height: parseFloat(form.height), sex: form.sex, activity: form.activity };
+    const rangeError = validateProfile(profile);
+    if (rangeError) { setError(rangeError); return; }
+    if (!form.sex || !form.activity || !form.goal) { setError("Elegí sexo, nivel de actividad y objetivo."); return; }
+    setError("");
+    onSubmit(profile, form.goal);
+  }
+
+  const label = text => <label style={{ fontSize: 12, fontWeight: 800, color: COLORS.graphite, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: 6 }}>{text}</label>;
+
+  return (
+    <div style={{ minHeight: 620, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div style={{ background: "linear-gradient(150deg, #064F1F 0%, #0B6F2B 40%, #28B84B 100%)", padding: "40px 28px 52px", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", right: -40, top: -30, width: 160, height: 160, borderRadius: "50%", background: "rgba(255,255,255,0.09)" }} />
+        <div style={{ position: "relative", zIndex: 2 }}>
+          <div style={{ color: "#fff", fontWeight: 900, fontSize: 24, lineHeight: 1.2 }}>Contanos sobre vos{name ? `, ${name.split(" ")[0]}` : ""}</div>
+          <div style={{ color: "rgba(255,255,255,0.85)", fontSize: 13, marginTop: 5 }}>Con estos datos calculamos tus metas de calorías y de agua.</div>
+        </div>
+      </div>
+      <div style={{ flex: 1, background: COLORS.paper, borderRadius: "26px 26px 0 0", marginTop: -22, padding: "26px 24px 28px", animation: "ppSlideLeft .35s ease" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+          <div>{label("Edad")}<TextInput type="number" placeholder="años" value={form.age} onChange={e => set("age", e.target.value)} /></div>
+          <div>{label("Peso")}<TextInput type="number" placeholder="kg" value={form.weight} onChange={e => set("weight", e.target.value)} /></div>
+          <div>{label("Altura")}<TextInput type="number" placeholder="cm" value={form.height} onChange={e => set("height", e.target.value)} /></div>
+        </div>
+        <div style={{ marginTop: 16 }}>
+          {label("Sexo")}
+          <div style={{ display: "flex", gap: 8 }}>
+            <Chip active={form.sex === "femenino"} onClick={() => set("sex", "femenino")}>Femenino</Chip>
+            <Chip active={form.sex === "masculino"} onClick={() => set("sex", "masculino")}>Masculino</Chip>
+          </div>
+        </div>
+        <div style={{ marginTop: 16 }}>
+          {label("Nivel de actividad")}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {ACTIVITY_LEVELS.map(a => <Chip key={a.id} active={form.activity === a.id} onClick={() => set("activity", a.id)}>{a.label} · {a.desc}</Chip>)}
+          </div>
+        </div>
+        <div style={{ marginTop: 16 }}>
+          {label("Objetivo")}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {GOALS.map(g => <Chip key={g.id} active={form.goal === g.id} onClick={() => set("goal", g.id)}>{g.label}</Chip>)}
+          </div>
+        </div>
+        {error && (
+          <div style={{ background: "#FFF2F2", border: "1.5px solid #FFD6D6", borderRadius: 14, padding: "12px 16px", marginTop: 16, animation: "ppPop .3s ease" }}>
+            <span style={{ fontSize: 13, color: "#C0392B", fontWeight: 600 }}>⚠️ {error}</span>
+          </div>
+        )}
+        <NutritionistNotice style={{ marginTop: 16 }} />
+        <DeviceDataNotice style={{ marginTop: 8 }} />
+        <PrimaryButton onClick={submit} style={{ marginTop: 16 }}>Empezar</PrimaryButton>
+        <button onClick={onLogout} style={{ width: "100%", background: "none", border: "none", color: COLORS.graphite, fontWeight: 700, fontSize: 13, cursor: "pointer", padding: "14px 0 0", fontFamily: "inherit" }}>Cerrar sesión</button>
+      </div>
+    </div>
+  );
+}
+
 // ─── App principal ────────────────────────────────────────────────────────────
 function ProgressPlusApp() {
   // ── Auth state ──────────────────────────────────────────────────────────────
@@ -1399,6 +1708,9 @@ function ProgressPlusApp() {
   const [editForm, setEditForm] = useState(null);
   const [statsRange, setStatsRange] = useState("semana");
   const [quickSheetOpen, setQuickSheetOpen] = useState(false);
+  const [planOffsets, setPlanOffsets] = useState({});
+  const dataRef = useRef(null);
+  dataRef.current = data;
 
   // ── Splash: revisar sesión guardada ─────────────────────────────────────────
   useEffect(() => {
@@ -1423,20 +1735,27 @@ function ProgressPlusApp() {
     const storage = makeStorage(user.id);
     try {
       const res = await storage.get("profile");
-      const base = defaultProfile();
-      const parsed = res ? JSON.parse(res.value) : base;
+      const base = emptyData();
+      const parsed = res ? JSON.parse(res.value) : {};
       const migrated = {
         ...base, ...parsed,
-        account: { ...(base.account || {}), ...(parsed.account || {}), name: user.name, email: user.email },
-        profile: parsed.profile || base.profile,
-        goal: parsed.goal || base.goal,
-        onboardingDone: true,
+        account: { name: user.name, email: user.email },
+        settings: { ...base.settings, ...(parsed.settings || {}) },
       };
+      // Datos de la versión anterior, que arrancaba con un perfil inventado (70 kg):
+      // se descarta ese perfil y se pide el paso de datos físicos.
+      if ((parsed.weightLog || []).some(w => w.id === "init")) {
+        migrated.weightLog = parsed.weightLog.filter(w => w.id !== "init");
+        migrated.profile = null;
+        migrated.goal = null;
+        migrated.settings = { ...migrated.settings, notifWater: false };
+      }
+      migrated.onboardingDone = !!(migrated.profile && migrated.goal);
       setCurrentUser(user);
       setData(migrated);
       setAuthScreen("app");
     } catch (e) {
-      const fresh = defaultProfile();
+      const fresh = emptyData();
       fresh.account = { name: user.name, email: user.email };
       setCurrentUser(user);
       setData(fresh);
@@ -1448,6 +1767,11 @@ function ProgressPlusApp() {
 
   // ── persist ──────────────────────────────────────────────────────────────────
   const persist = useCallback(async (next) => {
+    if (next.profile) {
+      const fresh = earnedAchievements(next, calcWaterGoalMl(next.profile)).filter(id => !next.achievements.includes(id));
+      fresh.forEach(id => push(`Logro desbloqueado: ${ACHIEVEMENT_DEFS.find(a => a.id === id).label}`, "ok"));
+      if (fresh.length) next = { ...next, achievements: [...next.achievements, ...fresh] };
+    }
     setData(next);
     if (!currentUser) return;
     const storage = makeStorage(currentUser.id);
@@ -1494,13 +1818,26 @@ function ProgressPlusApp() {
     setAuthScreen("login");
   }
 
-  // ── Unlocks ──────────────────────────────────────────────────────────────────
-  const unlockAchievement = useCallback((id, current) => {
-    if (current.achievements.includes(id)) return current;
-    const def = ACHIEVEMENT_DEFS.find(a => a.id === id);
-    push(`Logro desbloqueado: ${def.label}`, "ok");
-    return { ...current, achievements: [...current.achievements, id] };
-  }, [push]);
+  // ── Recordatorios de agua (solo mientras la app está abierta) ─────────────────
+  const remindersOn = !!(data?.settings?.notifWater && data?.profile);
+  const reminderHours = data?.settings?.waterReminderFreqHours || 2;
+  useEffect(() => {
+    if (!remindersOn) return;
+    const timer = setInterval(() => {
+      const d = dataRef.current;
+      if (!d?.profile) return;
+      const today = todayISO();
+      const drunk = d.water.filter(w => w.date === today).reduce((s, w) => s + w.ml, 0);
+      const missing = calcWaterGoalMl(d.profile) - drunk;
+      if (missing <= 0) return;
+      const body = `Te faltan ${missing} ml para tu meta de agua de hoy.`;
+      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+        new Notification("Progress+ · Hora de tomar agua", { body });
+      }
+      push("💧 " + body, "ok");
+    }, reminderHours * 60 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, [remindersOn, reminderHours, push]);
 
   // ── Splash ───────────────────────────────────────────────────────────────────
   if (authScreen === "splash") {
@@ -1567,13 +1904,12 @@ function ProgressPlusApp() {
   const consumedCarbs   = todayMeals.reduce((s, m) => s + (m.c || 0), 0);
   const consumedFat     = todayMeals.reduce((s, m) => s + (m.g || 0), 0);
   const goalDef = GOALS.find(g => g.id === data.goal);
+  const minorLosing = !!(data.profile && isMinor(data.profile) && data.goal === "bajar_peso");
 
   // ── Funciones ────────────────────────────────────────────────────────────────
   function addMealFromCatalog(item) {
     const meal = { id: uid(), date: todayStr, slot: mealSlot, name: item.name, kcal: item.kcal, p: item.p, c: item.c, g: item.g, time: new Date().toISOString() };
-    let next = { ...data, meals: [...data.meals, meal] };
-    if (next.meals.length === 1) next = unlockAchievement("primer_registro", next);
-    persist(next);
+    persist({ ...data, meals: [...data.meals, meal] });
     push(`${item.name} agregado`);
     setMealSheetOpen(false); setMealSearch("");
   }
@@ -1582,22 +1918,14 @@ function ProgressPlusApp() {
     const kcal = parseFloat(manualMeal.kcal);
     if (!manualMeal.name.trim() || !kcal || kcal <= 0) { push("Completá nombre y calorías.", "error"); return; }
     const meal = { id: uid(), date: todayStr, slot: mealSlot, name: manualMeal.name.trim(), kcal, p: 0, c: 0, g: 0, time: new Date().toISOString() };
-    let next = { ...data, meals: [...data.meals, meal] };
-    if (next.meals.length === 1) next = unlockAchievement("primer_registro", next);
-    persist(next);
+    persist({ ...data, meals: [...data.meals, meal] });
     push(`${manualMeal.name} agregado`);
     setManualMeal({ name: "", kcal: "" }); setMealSheetOpen(false);
   }
 
   function addWater(ml) {
     const entry = { id: uid(), date: todayStr, ml, time: new Date().toISOString() };
-    let next = { ...data, water: [...data.water, entry] };
-    const totalToday = next.water.filter(w => w.date === todayStr).reduce((s, w) => s + w.ml, 0);
-    if (totalToday >= waterGoalMl) {
-      const last3 = Array.from(new Set(next.water.map(w => w.date))).slice(-3);
-      if (last3.length >= 3) next = unlockAchievement("hidratacion_3", next);
-    }
-    persist(next);
+    persist({ ...data, water: [...data.water, entry] });
     push(`+${ml}ml de agua registrados`);
   }
 
@@ -1608,9 +1936,7 @@ function ProgressPlusApp() {
     const intensityMult = workoutForm.intensity === "alta" ? 1.25 : workoutForm.intensity === "baja" ? 0.8 : 1;
     const kcalBurned = Math.round(duration * typeDef.metPerMin * (data.profile?.weight || 70) * intensityMult);
     const workout = { id: uid(), date: todayStr, type: workoutForm.type, duration, intensity: workoutForm.intensity, kcalBurned, time: new Date().toISOString() };
-    let next = { ...data, workouts: [...data.workouts, workout] };
-    if (next.workouts.length >= 5) next = unlockAchievement("entreno_5", next);
-    persist(next);
+    persist({ ...data, workouts: [...data.workouts, workout] });
     push(`Entrenamiento registrado · ${kcalBurned} kcal estimadas`);
     setWorkoutSheetOpen(false); setWorkoutForm({ type: "cardio", duration: "30", intensity: "media" });
   }
@@ -1618,35 +1944,94 @@ function ProgressPlusApp() {
   function saveWeight() {
     const w = parseFloat(weightInput);
     if (!w || w < 20 || w > 300) { push("Ingresá un peso válido.", "error"); return; }
-    let next = { ...data, weightLog: [...data.weightLog, { id: uid(), date: todayStr, weight: w }], profile: { ...data.profile, weight: w } };
-    if (data.weightLog.length === 0) next = unlockAchievement("peso_registrado", next);
-    persist(next); push("Peso registrado");
+    persist({ ...data, weightLog: [...data.weightLog, { id: uid(), date: todayStr, weight: w }], profile: { ...data.profile, weight: w } });
+    push("Peso registrado");
     setWeightSheetOpen(false); setWeightInput("");
   }
 
+  function deleteWater(id) {
+    persist({ ...data, water: data.water.filter(w => w.id !== id) });
+    push("Registro de agua eliminado");
+  }
+
+  function deleteWeight(id) {
+    if (data.weightLog.length <= 1) return;
+    const weightLog = data.weightLog.filter(w => w.id !== id);
+    persist({ ...data, weightLog, profile: { ...data.profile, weight: weightLog[weightLog.length - 1].weight } });
+    push("Registro de peso eliminado");
+  }
+
+  function logPlan(slotId, option) {
+    const portion = option.portion !== 1 ? ` (porción × ${String(option.portion).replace(".", ",")})` : "";
+    const meal = { id: uid(), date: todayStr, slot: slotId, name: option.label + portion, kcal: option.kcal, p: option.p, c: option.c, g: option.g, time: new Date().toISOString() };
+    persist({ ...data, meals: [...data.meals, meal] });
+    push(`${MEAL_SLOTS.find(s => s.id === slotId).label} registrado · ${option.kcal} kcal`);
+  }
+
+  async function toggleReminders() {
+    if (data.settings.notifWater) {
+      persist({ ...data, settings: { ...data.settings, notifWater: false } });
+      push("Recordatorios desactivados");
+      return;
+    }
+    const supported = typeof Notification !== "undefined";
+    if (supported && Notification.permission === "default") {
+      try { await Notification.requestPermission(); } catch (e) { /* se avisa dentro de la app */ }
+    }
+    persist({ ...data, settings: { ...data.settings, notifWater: true } });
+    push(supported && Notification.permission === "granted"
+      ? "Recordatorios activados"
+      : "Recordatorios activados: los vas a ver dentro de la app porque el navegador no permite notificaciones");
+  }
+
+  function completePhysicalData(profile, goal) {
+    persist({ ...data, profile, goal, weightLog: [...data.weightLog, { id: uid(), date: todayISO(), weight: profile.weight }], onboardingDone: true });
+    push("¡Listo! Tus metas ya están calculadas 🎉");
+  }
+
   function saveEditProfile() {
-    const age = parseInt(editForm.age, 10), weight = parseFloat(editForm.weight), height = parseFloat(editForm.height);
-    if (!age || !weight || !height) { push("Completá todos los campos.", "error"); return; }
-    persist({ ...data, profile: { ...data.profile, age, weight, height, sex: editForm.sex, activity: editForm.activity }, goal: editForm.goal });
+    const name = (editForm.name || "").trim();
+    const age = Number(editForm.age), weight = parseFloat(editForm.weight), height = parseFloat(editForm.height);
+    if (name.length < 2) { push("El nombre tiene que tener al menos 2 letras.", "error"); return; }
+    const rangeError = validateProfile({ age, weight, height });
+    if (rangeError) { push(rangeError, "error"); return; }
+    if (name !== currentUser.name) {
+      saveUsers(loadUsers().map(u => u.id === currentUser.id ? { ...u, name } : u));
+      setCurrentUser({ ...currentUser, name });
+    }
+    // Un peso distinto queda en el historial, como cualquier registro de peso.
+    const weightLog = weight !== data.profile.weight ? [...data.weightLog, { id: uid(), date: todayStr, weight }] : data.weightLog;
+    persist({ ...data, account: { ...data.account, name }, weightLog, profile: { ...data.profile, age, weight, height, sex: editForm.sex, activity: editForm.activity }, goal: editForm.goal });
     push("Perfil actualizado"); setEditProfileOpen(false);
   }
 
   function resetAllData() {
-    const fresh = defaultProfile();
+    const fresh = emptyData();
     fresh.account = { name: currentUser.name, email: currentUser.email };
     persist(fresh);
+    setActiveTab("dashboard");
     push("Se borraron todos tus datos");
+  }
+
+  // ── Paso de datos físicos pendiente ────────────────────────────────────────────
+  if (!data.onboardingDone) {
+    return (
+      <div style={shellStyle}>
+        <PhysicalDataScreen name={currentUser?.name} onSubmit={completePhysicalData} onLogout={handleLogout} />
+        <Toasts toasts={toasts} />
+      </div>
+    );
   }
 
   // ── Render app ───────────────────────────────────────────────────────────────
   return (
     <div style={shellStyle}>
       <div style={{ paddingBottom: 8 }}>
-        {activeTab === "dashboard" && <DashboardScreen data={data} todayStr={todayStr} consumedKcal={consumedKcal} calorieGoal={calorieGoal} consumedWater={consumedWater} waterGoalMl={waterGoalMl} todayWorkouts={todayWorkouts} goalDef={goalDef} onNavTab={setActiveTab} accountName={currentUser?.name} />}
-        {activeTab === "nutrition" && <NutritionScreen calorieGoal={calorieGoal} consumedKcal={consumedKcal} macros={macros} consumedProtein={consumedProtein} consumedCarbs={consumedCarbs} consumedFat={consumedFat} todayMeals={todayMeals} onOpenMealSheet={(slot) => { setMealSlot(slot); setMealSheetOpen(true); }} onDeleteMeal={(id) => { persist({ ...data, meals: data.meals.filter(m => m.id !== id) }); push("Comida eliminada"); }} />}
-        {activeTab === "hydration" && <HydrationScreen consumedWater={consumedWater} waterGoalMl={waterGoalMl} onAddWater={addWater} waterCustom={waterCustom} setWaterCustom={setWaterCustom} onAddCustom={() => { const ml = parseInt(waterCustom, 10); if (!ml || ml <= 0 || ml > 5000) { push("Ingresá una cantidad válida en ml.", "error"); return; } addWater(ml); setWaterCustom(""); }} settings={data.settings} onToggleSetting={(key) => persist({ ...data, settings: { ...data.settings, [key]: !data.settings[key] } })} onSetFreq={(h) => persist({ ...data, settings: { ...data.settings, waterReminderFreqHours: h } })} />}
-        {activeTab === "training" && <TrainingScreen todayWorkouts={todayWorkouts} weightLog={data.weightLog} onOpenWorkoutSheet={() => setWorkoutSheetOpen(true)} onOpenWeightSheet={() => setWeightSheetOpen(true)} />}
-        {activeTab === "profile" && <ProfileStatsScreen data={data} goalDef={goalDef} statsRange={statsRange} setStatsRange={setStatsRange} onEditProfile={() => { setEditForm({ ...data.profile, goal: data.goal }); setEditProfileOpen(true); }} onLogout={handleLogout} onResetData={resetAllData} calorieGoal={calorieGoal} waterGoalMl={waterGoalMl} />}
+        {activeTab === "dashboard" && <DashboardScreen data={data} todayStr={todayStr} consumedKcal={consumedKcal} calorieGoal={calorieGoal} consumedWater={consumedWater} waterGoalMl={waterGoalMl} todayWorkouts={todayWorkouts} goalDef={goalDef} onNavTab={setActiveTab} accountName={currentUser?.name} macros={macros} consumedProtein={consumedProtein} consumedCarbs={consumedCarbs} consumedFat={consumedFat} />}
+        {activeTab === "nutrition" && <NutritionScreen calorieGoal={calorieGoal} consumedKcal={consumedKcal} macros={macros} consumedProtein={consumedProtein} consumedCarbs={consumedCarbs} consumedFat={consumedFat} todayMeals={todayMeals} onOpenMealSheet={(slot) => { setMealSlot(slot); setMealSheetOpen(true); }} onDeleteMeal={(id) => { persist({ ...data, meals: data.meals.filter(m => m.id !== id) }); push("Comida eliminada"); }} planOffsets={planOffsets} onRotatePlan={(slot) => setPlanOffsets(o => ({ ...o, [slot]: (o[slot] || 0) + 1 }))} onLogPlan={logPlan} minorLosing={minorLosing} />}
+        {activeTab === "hydration" && <HydrationScreen consumedWater={consumedWater} waterGoalMl={waterGoalMl} onAddWater={addWater} waterCustom={waterCustom} setWaterCustom={setWaterCustom} onAddCustom={() => { const ml = parseInt(waterCustom, 10); if (!ml || ml <= 0 || ml > 5000) { push("Ingresá una cantidad válida en ml.", "error"); return; } addWater(ml); setWaterCustom(""); }} settings={data.settings} onToggleReminders={toggleReminders} onSetFreq={(h) => persist({ ...data, settings: { ...data.settings, waterReminderFreqHours: h } })} todayWater={todayWater} onDeleteWater={deleteWater} />}
+        {activeTab === "training" && <TrainingScreen todayWorkouts={todayWorkouts} weightLog={data.weightLog} onOpenWorkoutSheet={() => setWorkoutSheetOpen(true)} onOpenWeightSheet={() => setWeightSheetOpen(true)} onDeleteWeight={deleteWeight} />}
+        {activeTab === "profile" && <ProfileStatsScreen data={data} goalDef={goalDef} statsRange={statsRange} setStatsRange={setStatsRange} onEditProfile={() => { setEditForm({ ...data.profile, goal: data.goal, name: currentUser?.name || "" }); setEditProfileOpen(true); }} onLogout={handleLogout} onResetData={resetAllData} calorieGoal={calorieGoal} waterGoalMl={waterGoalMl} />}
       </div>
 
       <FloatingAdd onClick={() => setQuickSheetOpen(true)} />
@@ -1669,6 +2054,7 @@ function ProgressPlusApp() {
           <div style={{ position: "absolute", left: 14, top: 13 }}><Icon name="search" size={17} color={COLORS.graphite} /></div>
           <TextInput placeholder="Buscar alimento..." value={mealSearch} onChange={e => setMealSearch(e.target.value)} style={{ paddingLeft: 40 }} />
         </div>
+        <p style={{ fontSize: 11.5, color: COLORS.graphite, marginBottom: 8 }}>Catálogo de ejemplo con valores aproximados.</p>
         <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 240, overflowY: "auto", marginBottom: 18 }}>
           {FOOD_CATALOG.filter(f => f.name.toLowerCase().includes(mealSearch.toLowerCase())).map(f => (
             <div key={f.name} onClick={() => addMealFromCatalog(f)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 14px", borderRadius: 14, background: COLORS.cream, border: `1px solid ${COLORS.paperLine}`, cursor: "pointer", transition: "background .15s" }}>
@@ -1715,7 +2101,13 @@ function ProgressPlusApp() {
         {editForm && (
           <>
             <Field label="Nombre">
-              <TextInput value={editForm.name || currentUser?.name || ""} onChange={e => setEditForm({ ...editForm, name: e.target.value })} />
+              <TextInput value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} />
+            </Field>
+            <Field label="Sexo">
+              <div style={{ display: "flex", gap: 8 }}>
+                <Chip active={editForm.sex === "femenino"} onClick={() => setEditForm({ ...editForm, sex: "femenino" })}>Femenino</Chip>
+                <Chip active={editForm.sex === "masculino"} onClick={() => setEditForm({ ...editForm, sex: "masculino" })}>Masculino</Chip>
+              </div>
             </Field>
             <Field label="Edad"><TextInput type="number" value={editForm.age} onChange={e => setEditForm({ ...editForm, age: e.target.value })} /></Field>
             <Field label="Peso (kg)"><TextInput type="number" value={editForm.weight} onChange={e => setEditForm({ ...editForm, weight: e.target.value })} /></Field>
@@ -1730,6 +2122,7 @@ function ProgressPlusApp() {
                 {GOALS.map(g => <Chip key={g.id} active={editForm.goal === g.id} onClick={() => setEditForm({ ...editForm, goal: g.id })}>{g.label}</Chip>)}
               </div>
             </Field>
+            <p style={{ fontSize: 11.5, color: COLORS.graphite, marginBottom: 12 }}>Edad 10 a 100 años · peso 20 a 300 kg · altura 100 a 250 cm.</p>
             <PrimaryButton onClick={saveEditProfile} style={{ marginTop: 6 }}>Guardar cambios</PrimaryButton>
           </>
         )}
