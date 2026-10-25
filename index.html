@@ -38,7 +38,8 @@
     input:focus { box-shadow: none; outline: none; }
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-thumb { background: #E8E2D2; border-radius: 4px; }
-    #root { width: 100%; max-width: 430px; }
+    #root { width: 100%; }
+    @media (min-width: 900px) { body { padding: 24px; } }
     button { -webkit-tap-highlight-color: transparent; }
   </style>
 </head>
@@ -47,6 +48,21 @@
 
 <script type="text/babel">
 const { useState, useEffect, useCallback, useMemo, useRef } = React;
+
+// ─── Pantalla ancha (plan final, PP1) ────────────────────────────────────────
+// Desde 900 px la app usa navegación lateral y aprovecha el ancho; debajo, la vista de celular.
+const WIDE_QUERY = "(min-width: 900px)";
+function useWide() {
+  const [wide, setWide] = useState(() => window.matchMedia(WIDE_QUERY).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(WIDE_QUERY);
+    const onChange = () => setWide(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return wide;
+}
+const WideContext = React.createContext(false);
 
 // ─── Crypto helpers ──────────────────────────────────────────────────────────
 async function sha256(text) {
@@ -525,14 +541,43 @@ function ScreenHeader({ title, onBack, right }) {
   );
 }
 
+const NAV_TABS = [
+  { id: "dashboard", label: "Inicio", icon: "home", color: COLORS.moss, bg: COLORS.mossLight },
+  { id: "nutrition", label: "Nutricion", icon: "bowl", color: COLORS.clayDark, bg: COLORS.clayLight },
+  { id: "hydration", label: "Agua", icon: "drop", color: COLORS.waterDark, bg: COLORS.waterLight },
+  { id: "training", label: "Entreno", icon: "dumbbell", color: COLORS.violetDark, bg: COLORS.violetLight },
+  { id: "profile", label: "Perfil", icon: "user", color: COLORS.mossDark, bg: COLORS.mossLight },
+];
+
+// Navegación lateral para pantallas anchas. El botón "Registrar" reemplaza al botón flotante.
+function SideNav({ active, onChange, onAdd }) {
+  return (
+    <nav aria-label="Secciones" style={{ width: 232, flexShrink: 0, display: "flex", flexDirection: "column", gap: 4, padding: "26px 14px 22px", borderRight: "1px solid " + COLORS.paperLine, background: "rgba(255,255,255,0.55)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 10px 22px" }}>
+        <AuthLogo size={38} />
+        <span style={{ fontWeight: 900, fontSize: 18, color: COLORS.ink }}>Progress+</span>
+      </div>
+      {NAV_TABS.map(t => {
+        const isActive = active === t.id;
+        return (
+          <button key={t.id} onClick={() => onChange(t.id)} aria-current={isActive ? "page" : undefined} style={{
+            display: "flex", alignItems: "center", gap: 12, padding: "11px 12px", borderRadius: 14, border: "none", cursor: "pointer",
+            background: isActive ? t.bg : "transparent", color: isActive ? t.color : COLORS.graphite, fontWeight: 800, fontSize: 14.5,
+            fontFamily: "inherit", textAlign: "left", transition: "background .2s",
+          }}>
+            <Icon name={t.icon} size={20} color={isActive ? t.color : "#8E9893"} />
+            {t.label}
+          </button>
+        );
+      })}
+      <div style={{ flex: 1 }} />
+      <PrimaryButton onClick={onAdd} style={{ padding: "13px 18px", fontSize: 14.5 }}>+ Registrar</PrimaryButton>
+    </nav>
+  );
+}
+
 function TabBar({ active, onChange }) {
-  const tabs = [
-    { id: "dashboard", label: "Inicio", icon: "home", color: COLORS.moss, bg: COLORS.mossLight },
-    { id: "nutrition", label: "Nutricion", icon: "bowl", color: COLORS.clayDark, bg: COLORS.clayLight },
-    { id: "hydration", label: "Agua", icon: "drop", color: COLORS.waterDark, bg: COLORS.waterLight },
-    { id: "training", label: "Entreno", icon: "dumbbell", color: COLORS.violetDark, bg: COLORS.violetLight },
-    { id: "profile", label: "Perfil", icon: "user", color: COLORS.mossDark, bg: COLORS.mossLight },
-  ];
+  const tabs = NAV_TABS;
   return (
     <div style={{ position: "sticky", bottom: 0, background: "rgba(255,255,255,0.97)", borderTop: "1px solid " + COLORS.paperLine, display: "flex", padding: "8px 8px 12px", zIndex: 10, boxShadow: "0 -18px 35px -28px rgba(20,32,26,0.45)", backdropFilter: "blur(18px)" }}>
       {tabs.map(t => {
@@ -555,7 +600,7 @@ function TabBar({ active, onChange }) {
 function FloatingAdd({ onClick }) {
   return (
     <button onClick={onClick} style={{
-      position: "fixed", bottom: 86, right: "calc(50% - 190px)", width: 58, height: 58, borderRadius: "50%",
+      position: "fixed", bottom: 86, right: "max(16px, calc(50% - 264px))", width: 58, height: 58, borderRadius: "50%",
       background: "linear-gradient(135deg, " + COLORS.moss + ", " + COLORS.mossDark + ")", color: COLORS.cream, border: "4px solid rgba(255,255,255,0.9)", cursor: "pointer",
       display: "flex", alignItems: "center", justifyContent: "center",
       boxShadow: "0 20px 38px -10px rgba(18,128,46,0.55), 0 0 0 8px rgba(53,199,87,0.12)", zIndex: 20,
@@ -567,15 +612,16 @@ function FloatingAdd({ onClick }) {
 }
 
 function Sheet({ open, onClose, title, children }) {
+  const wide = React.useContext(WideContext);
   if (!open) return null;
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(17,28,23,0.5)", zIndex: 50, display: "flex", alignItems: "flex-end", justifyContent: "center" }} onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} style={{
-        background: COLORS.paper, borderRadius: "26px 26px 0 0", width: "100%", maxWidth: 480,
+    <div style={{ position: "fixed", inset: 0, background: "rgba(17,28,23,0.5)", zIndex: 50, display: "flex", alignItems: wide ? "center" : "flex-end", justifyContent: "center", padding: wide ? 24 : 0 }} onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={title} style={{
+        background: COLORS.paper, borderRadius: wide ? 26 : "26px 26px 0 0", width: "100%", maxWidth: wide ? 540 : 480,
         maxHeight: "85vh", overflowY: "auto", padding: "20px 22px 28px", animation: "ppSheetUp .25s ease",
         boxShadow: "0 -20px 50px -20px rgba(20,32,26,0.35)",
       }}>
-        <div style={{ width: 44, height: 5, background: COLORS.paperLine, borderRadius: 4, margin: "0 auto 16px" }} />
+        {!wide && <div style={{ width: 44, height: 5, background: COLORS.paperLine, borderRadius: 4, margin: "0 auto 16px" }} />}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
           <h2 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 19, margin: 0 }}>{title}</h2>
           <button onClick={onClose} style={{ background: COLORS.paperLine, border: "none", borderRadius: 10, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
@@ -699,20 +745,6 @@ function WeekStrip({ todayStr }) {
   );
 }
 
-function AthleteMark() {
-  return (
-    <div style={{ position: "absolute", right: 10, bottom: 0, width: 118, height: 150, pointerEvents: "none", animation: "ppFloat 4s ease-in-out infinite" }}>
-      <div style={{ position: "absolute", right: 34, top: 8, width: 30, height: 30, borderRadius: "50%", background: "#F7C69A", boxShadow: "0 8px 18px -10px rgba(0,0,0,0.45)" }} />
-      <div style={{ position: "absolute", right: 16, top: 36, width: 58, height: 72, borderRadius: "28px 28px 18px 18px", background: "linear-gradient(160deg, #101F19, #2C6240)", transform: "rotate(-7deg)" }} />
-      <div style={{ position: "absolute", right: 62, top: 55, width: 48, height: 12, borderRadius: 999, background: "#F7C69A", transform: "rotate(-24deg)" }} />
-      <div style={{ position: "absolute", right: 5, top: 62, width: 42, height: 12, borderRadius: 999, background: "#F7C69A", transform: "rotate(25deg)" }} />
-      <div style={{ position: "absolute", right: 54, top: 104, width: 16, height: 46, borderRadius: 999, background: "#111C17", transform: "rotate(18deg)" }} />
-      <div style={{ position: "absolute", right: 25, top: 104, width: 16, height: 48, borderRadius: 999, background: "#111C17", transform: "rotate(-15deg)" }} />
-      <div style={{ position: "absolute", right: 0, top: 69, width: 22, height: 30, borderRadius: 9, background: COLORS.water, border: "3px solid rgba(255,255,255,0.45)" }} />
-    </div>
-  );
-}
-
 function StatPill({ label, value, color }) {
   return (
     <div style={{ flex: 1, minWidth: 0 }}>
@@ -731,6 +763,7 @@ function DashboardScreen({ data, todayStr, consumedKcal, calorieGoal, consumedWa
   const kcalPct = Math.min(100, Math.round((consumedKcal / calorieGoal) * 100 || 0));
   const workoutMins = todayWorkouts.reduce((s, w) => s + w.duration, 0);
   const remaining = Math.max(0, calorieGoal - consumedKcal);
+  const wide = React.useContext(WideContext);
   return (
     <div>
       <div style={{ padding: "18px 20px 2px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -745,37 +778,34 @@ function DashboardScreen({ data, todayStr, consumedKcal, calorieGoal, consumedWa
         </button>
       </div>
       <WeekStrip todayStr={todayStr} />
-      <div style={{ padding: "10px 20px 22px" }}>
-        <Card onClick={() => onNavTab("nutrition")} style={{ cursor: "pointer", padding: 18, minHeight: 218, overflow: "hidden", border: "none", color: COLORS.cream, background: "linear-gradient(150deg, #064F1F 0%, #0B6F2B 32%, #28B84B 64%, #6FE07A 100%)", position: "relative", boxShadow: "0 28px 50px -26px rgba(8,122,42,0.8)" }}>
+      <div style={{ padding: "10px 20px 22px", display: wide ? "grid" : "block", gridTemplateColumns: "minmax(0, 1.55fr) minmax(0, 1fr)", gap: 16, alignItems: "start" }}>
+        <Card onClick={() => onNavTab("nutrition")} style={{ cursor: "pointer", padding: wide ? 24 : 18, overflow: "hidden", border: "none", color: COLORS.cream, background: "linear-gradient(150deg, #064F1F 0%, #0B6F2B 32%, #28B84B 64%, #6FE07A 100%)", position: "relative", boxShadow: "0 28px 50px -26px rgba(8,122,42,0.8)" }}>
           <div style={{ position: "absolute", left: -38, top: -34, width: 128, height: 128, borderRadius: "50%", border: "20px solid rgba(255,255,255,0.09)" }} />
-          <div style={{ position: "absolute", right: -38, bottom: -42, width: 150, height: 150, borderRadius: "50%", background: "rgba(255,255,255,0.10)", animation: "ppPulse 5s ease-in-out infinite" }} />
-          <div style={{ position: "absolute", left: 30, bottom: 14, width: 54, height: 54, borderRadius: "50%", background: "rgba(255,208,90,0.20)", filter: "blur(2px)" }} />
-          <AthleteMark />
-          <div style={{ position: "relative", zIndex: 2, maxWidth: 230 }}>
-            <p style={{ fontSize: 12, fontWeight: 900, opacity: 0.88, marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}><span>🔥</span> Calorias de hoy</p>
-            <div style={{ display: "flex", alignItems: "flex-end", gap: 8 }}>
-              <div style={{ fontFamily: "'Space Mono', monospace", fontWeight: 700, fontSize: 36, lineHeight: 1 }}>{Math.round(consumedKcal)}</div>
-              <div style={{ fontSize: 12.5, opacity: 0.82, marginBottom: 4 }}>/ {calorieGoal} kcal</div>
+          <div style={{ position: "absolute", right: -38, bottom: -42, width: 150, height: 150, borderRadius: "50%", background: "rgba(255,255,255,0.10)" }} />
+          <div style={{ position: "relative", zIndex: 2, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <p style={{ fontSize: 12, fontWeight: 900, opacity: 0.88, marginBottom: 10 }}>Calorias de hoy</p>
+              <div style={{ display: "flex", alignItems: "flex-end", gap: 8, flexWrap: "wrap" }}>
+                <div style={{ fontFamily: "'Space Mono', monospace", fontWeight: 700, fontSize: wide ? 44 : 36, lineHeight: 1 }}>{Math.round(consumedKcal)}</div>
+                <div style={{ fontSize: 12.5, opacity: 0.82, marginBottom: 4 }}>/ {calorieGoal} kcal</div>
+              </div>
+              <div style={{ fontSize: 12, opacity: .88, marginTop: 6 }}>Restantes {Math.round(remaining)} kcal</div>
             </div>
-            <div style={{ fontSize: 12, opacity: .88, marginTop: 6 }}>Restantes {Math.round(remaining)} kcal</div>
-            <div style={{ marginTop: 18, height: 10, width: 186, borderRadius: 999, background: "rgba(255,255,255,0.26)", overflow: "hidden" }}>
-              <div style={{ width: kcalPct + "%", height: "100%", borderRadius: 999, background: "linear-gradient(90deg, #FFD05A, #FFE9A8)", transition: "width .7s ease" }} />
-            </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 18, width: 230 }}>
-              <StatPill label="Proteinas" value={macroPct(consumedProtein, macros.protein)} color={COLORS.yellow} />
-              <StatPill label="Carbos" value={macroPct(consumedCarbs, macros.carbs)} color="#B7F7C5" />
-              <StatPill label="Grasas" value={macroPct(consumedFat, macros.fat)} color="#FFFFFF" />
-            </div>
-          </div>
-          <div style={{ position: "absolute", right: 108, top: 22, zIndex: 3 }}>
-            <ProgressRing value={consumedKcal} max={calorieGoal} size={86} stroke={10} color={COLORS.yellow} trackColor="rgba(255,255,255,0.22)">
+            <ProgressRing value={consumedKcal} max={calorieGoal} size={wide ? 132 : 104} stroke={wide ? 13 : 11} color={COLORS.yellow} trackColor="rgba(255,255,255,0.22)">
               <div style={{ textAlign: "center" }}>
-                <div style={{ fontWeight: 900, fontSize: 18 }}>{kcalPct}%</div>
+                <div style={{ fontWeight: 900, fontSize: wide ? 26 : 21 }}>{kcalPct}%</div>
+                <div style={{ fontSize: 10.5, opacity: .85, fontWeight: 700 }}>de la meta</div>
               </div>
             </ProgressRing>
           </div>
+          <div style={{ position: "relative", zIndex: 2, display: "flex", gap: 12, marginTop: 20 }}>
+            <StatPill label="Proteinas" value={macroPct(consumedProtein, macros.protein)} color={COLORS.yellow} />
+            <StatPill label="Carbos" value={macroPct(consumedCarbs, macros.carbs)} color="#B7F7C5" />
+            <StatPill label="Grasas" value={macroPct(consumedFat, macros.fat)} color="#FFFFFF" />
+          </div>
         </Card>
-        <div style={{ display: "flex", gap: 12, marginTop: 14 }}>
+        <div>
+        <div style={{ display: "flex", gap: 12, marginTop: wide ? 0 : 14 }}>
           <MiniMetric icon="drop" title="Hidratacion" value={(consumedWater / 1000).toFixed(1) + "L"} sub={"de " + (waterGoalMl / 1000).toFixed(1) + "L"} color={COLORS.waterDark} bg={`linear-gradient(150deg, ${COLORS.waterLight}, #FFFFFF)`} onClick={() => onNavTab("hydration")} />
           <MiniMetric icon="dumbbell" title="Actividad" value={workoutMins ? workoutMins + " min" : "0 min"} sub={workoutMins ? "entrenado hoy" : "sin registrar"} color={COLORS.clayDark} bg={`linear-gradient(150deg, ${COLORS.clayLight}, #FFFFFF)`} onClick={() => onNavTab("training")} />
         </div>
@@ -787,6 +817,7 @@ function DashboardScreen({ data, todayStr, consumedKcal, calorieGoal, consumedWa
           </div>
           <button onClick={() => onNavTab("profile")} style={{ border: "none", background: `linear-gradient(135deg, ${COLORS.violet}, ${COLORS.violetDark})`, color: "#fff", fontWeight: 900, borderRadius: 999, padding: "9px 13px", cursor: "pointer", boxShadow: "0 10px 22px -15px rgba(90,64,214,0.7)" }}>Ver</button>
         </Card>
+        </div>
       </div>
     </div>
   );
@@ -840,6 +871,8 @@ function NutritionScreen({ calorieGoal, consumedKcal, macros, consumedProtein, c
     merienda: { bg: "linear-gradient(150deg, #E3DBFF, #B6A4FF)", ring: COLORS.violetDark, emoji: "🥗" },
     cena: { bg: "linear-gradient(150deg, #FFD9BC, #FFA45C)", ring: COLORS.clayDark, emoji: "🍽️" },
   };
+  const wide = React.useContext(WideContext);
+  const listStyle = wide ? { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 } : { display: "flex", flexDirection: "column", gap: 10 };
   return (
     <div>
       <ScreenHeader title="Plan alimenticio" />
@@ -875,7 +908,7 @@ function NutritionScreen({ calorieGoal, consumedKcal, macros, consumedProtein, c
           <div style={{ fontSize: 12, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: COLORS.mossDark }}>{planTotal} / {calorieGoal} kcal</div>
         </div>
         <p style={{ fontSize: 12, color: COLORS.graphite, marginBottom: 10 }}>Armado con el catálogo según tu meta. Tocá "Registrar" para sumarlo a la franja.</p>
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={listStyle}>
           {plan.map(({ slot, option }) => (
             <Card key={slot.id} style={{ padding: 13 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
@@ -892,7 +925,7 @@ function NutritionScreen({ calorieGoal, consumedKcal, macros, consumedProtein, c
           ))}
         </div>
         <div style={{ fontWeight: 900, fontSize: 15, margin: "22px 0 0" }}>Registrado hoy</div>
-        <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ marginTop: 18, ...listStyle }}>
           {MEAL_SLOTS.map(slot => {
             const items = todayMeals.filter(m => m.slot === slot.id);
             const slotKcal = items.reduce((s, m) => s + m.kcal, 0);
@@ -1683,6 +1716,7 @@ function PhysicalDataScreen({ name, onSubmit, onLogout }) {
 
 // ─── App principal ────────────────────────────────────────────────────────────
 function ProgressPlusApp() {
+  const wide = useWide();
   // ── Auth state ──────────────────────────────────────────────────────────────
   const [authScreen, setAuthScreen] = useState("splash"); // splash | login | register
   const [currentUser, setCurrentUser] = useState(null);   // { id, name, email, ... }
@@ -2025,17 +2059,21 @@ function ProgressPlusApp() {
 
   // ── Render app ───────────────────────────────────────────────────────────────
   return (
-    <div style={shellStyle}>
-      <div style={{ paddingBottom: 8 }}>
+    <WideContext.Provider value={wide}>
+    <div style={wide ? wideShellStyle : mobileShellStyle}>
+      {wide && <SideNav active={activeTab} onChange={setActiveTab} onAdd={() => setQuickSheetOpen(true)} />}
+      <main style={wide ? { flex: 1, minWidth: 0, height: "100%", overflowY: "auto" } : { flex: 1, paddingBottom: 8 }}>
+      <div style={wide ? { maxWidth: activeTab === "dashboard" || activeTab === "nutrition" ? 1040 : 760, margin: "0 auto", padding: "10px 18px 40px" } : undefined}>
         {activeTab === "dashboard" && <DashboardScreen data={data} todayStr={todayStr} consumedKcal={consumedKcal} calorieGoal={calorieGoal} consumedWater={consumedWater} waterGoalMl={waterGoalMl} todayWorkouts={todayWorkouts} goalDef={goalDef} onNavTab={setActiveTab} accountName={currentUser?.name} macros={macros} consumedProtein={consumedProtein} consumedCarbs={consumedCarbs} consumedFat={consumedFat} />}
         {activeTab === "nutrition" && <NutritionScreen calorieGoal={calorieGoal} consumedKcal={consumedKcal} macros={macros} consumedProtein={consumedProtein} consumedCarbs={consumedCarbs} consumedFat={consumedFat} todayMeals={todayMeals} onOpenMealSheet={(slot) => { setMealSlot(slot); setMealSheetOpen(true); }} onDeleteMeal={(id) => { persist({ ...data, meals: data.meals.filter(m => m.id !== id) }); push("Comida eliminada"); }} planOffsets={planOffsets} onRotatePlan={(slot) => setPlanOffsets(o => ({ ...o, [slot]: (o[slot] || 0) + 1 }))} onLogPlan={logPlan} minorLosing={minorLosing} />}
         {activeTab === "hydration" && <HydrationScreen consumedWater={consumedWater} waterGoalMl={waterGoalMl} onAddWater={addWater} waterCustom={waterCustom} setWaterCustom={setWaterCustom} onAddCustom={() => { const ml = parseInt(waterCustom, 10); if (!ml || ml <= 0 || ml > 5000) { push("Ingresá una cantidad válida en ml.", "error"); return; } addWater(ml); setWaterCustom(""); }} settings={data.settings} onToggleReminders={toggleReminders} onSetFreq={(h) => persist({ ...data, settings: { ...data.settings, waterReminderFreqHours: h } })} todayWater={todayWater} onDeleteWater={deleteWater} />}
         {activeTab === "training" && <TrainingScreen todayWorkouts={todayWorkouts} weightLog={data.weightLog} onOpenWorkoutSheet={() => setWorkoutSheetOpen(true)} onOpenWeightSheet={() => setWeightSheetOpen(true)} onDeleteWeight={deleteWeight} />}
         {activeTab === "profile" && <ProfileStatsScreen data={data} goalDef={goalDef} statsRange={statsRange} setStatsRange={setStatsRange} onEditProfile={() => { setEditForm({ ...data.profile, goal: data.goal, name: currentUser?.name || "" }); setEditProfileOpen(true); }} onLogout={handleLogout} onResetData={resetAllData} calorieGoal={calorieGoal} waterGoalMl={waterGoalMl} />}
       </div>
+      </main>
 
-      <FloatingAdd onClick={() => setQuickSheetOpen(true)} />
-      <TabBar active={activeTab} onChange={setActiveTab} />
+      {!wide && <FloatingAdd onClick={() => setQuickSheetOpen(true)} />}
+      {!wide && <TabBar active={activeTab} onChange={setActiveTab} />}
 
       <Sheet open={quickSheetOpen} onClose={() => setQuickSheetOpen(false)} title="Registro rápido">
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -2130,14 +2168,26 @@ function ProgressPlusApp() {
 
       <Toasts toasts={toasts} />
     </div>
+    </WideContext.Provider>
   );
 }
 
 const shellStyle = {
   fontFamily: "'Inter', sans-serif", background: COLORS.paper, color: COLORS.ink,
-  minHeight: 620, maxWidth: 430, margin: "0 auto", position: "relative",
+  minHeight: 620, maxWidth: 560, margin: "0 auto", position: "relative",
   borderRadius: 34, overflow: "hidden", border: "1px solid rgba(255,255,255,0.92)",
   boxShadow: "0 34px 80px -42px rgba(20,32,26,0.62)",
+};
+
+// Celular: la app ocupa todo el alto, así la barra de pestañas queda abajo y el botón "+" encima de ella.
+// `overflow: clip` recorta las esquinas sin crear un contenedor de scroll: con `hidden`, la barra de
+// pestañas (sticky) no quedaba fija abajo en las pantallas largas.
+const mobileShellStyle = { ...shellStyle, minHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", overflow: "clip" };
+
+// Pantalla ancha: navegación a la izquierda y contenido con su propio scroll.
+const wideShellStyle = {
+  ...shellStyle, maxWidth: 1240, width: "100%", minHeight: 600, height: "calc(100vh - 48px)",
+  display: "flex", borderRadius: 28,
 };
 
 ReactDOM.createRoot(document.getElementById("root")).render(<ProgressPlusApp />);
